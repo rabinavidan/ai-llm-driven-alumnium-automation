@@ -1,0 +1,63 @@
+# Fully self-contained AI test stack: local LLM + browser + runner.
+# No API keys, no cloud calls. `docker compose up --abort-on-container-exit tests`
+
+services:
+  # 1) Local model inference — this is what makes the demo offline & free.
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  # 2) One-shot: pull the model Alumnium expects, then exit.
+  ollama-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: "http://ollama:11434"
+    entrypoint: ["/bin/sh", "-c", "ollama pull qwen3.6"]
+    restart: "no"
+
+  # 3) Real Chromium in a container, with a noVNC viewer on :7900 for live demos.
+  selenium:
+    image: selenium/standalone-chromium:latest
+    shm_size: "2gb"
+    ports:
+      - "4444:4444"   # WebDriver
+      - "7900:7900"   # noVNC (password: secret) — watch the AI drive the browser
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4444/wd/hub/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # 4) The Alumnium + pytest runner.
+  tests:
+    build: .
+    depends_on:
+      selenium:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully
+    environment:
+      ALUMNIUM_MODEL: "ollama"
+      ALUMNIUM_OLLAMA_URL: "http://ollama:11434"
+      SELENIUM_URL: "http://selenium:4444"
+      BASE_URL: "https://www.saucedemo.com"
+      HEADLESS: "true"
+    volumes:
+      - ./allure-results:/app/allure-results
+    command: ["pytest"]
+
+volumes:
+  ollama-models:

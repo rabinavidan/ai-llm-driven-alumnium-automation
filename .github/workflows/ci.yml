@@ -1,0 +1,66 @@
+name: AI E2E (Alumnium) CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+# Needed for publishing the Allure report to the gh-pages branch.
+permissions:
+  contents: write
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    # Local CPU inference is slow — cap it and keep CI to the smoke subset.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      # Bring up the fully self-contained stack: Ollama + Selenium + runner.
+      # NOTE: qwen3.6 on a CPU GitHub runner is slow. This gate runs `-m smoke`.
+      # For fast, deterministic PR gates you can instead export a free hosted
+      # provider (see README "CI strategy") — the tests are identical.
+      - name: Run AI smoke suite (dockerized, offline)
+        run: |
+          docker compose run --rm \
+            -e HEADLESS=true \
+            tests pytest -m smoke
+
+      # Always publish a report, even on failure.
+      - name: Load Allure history
+        uses: actions/checkout@v4
+        if: always()
+        continue-on-error: true
+        with:
+          ref: gh-pages
+          path: gh-pages
+
+      - name: Generate Allure report
+        uses: simple-elf/allure-report-action@v1.9
+        if: always()
+        with:
+          allure_results: allure-results
+          allure_history: allure-history
+          gh_pages: gh-pages
+          keep_reports: 30
+
+      - name: Publish report to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        if: always() && github.ref == 'refs/heads/main'
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: allure-history
+
+      - name: Upload raw results as artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: allure-results
+          path: allure-results
