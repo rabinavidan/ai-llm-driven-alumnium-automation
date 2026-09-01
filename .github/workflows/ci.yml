@@ -23,12 +23,15 @@ jobs:
       - uses: actions/checkout@v4
 
       # Bring up the fully self-contained stack: Ollama + Selenium + runner.
-      # NOTE: qwen3.6 on a CPU GitHub runner is slow. This gate runs `-m smoke`.
-      # For fast, deterministic PR gates you can instead export a free hosted
-      # provider (see README "CI strategy") — the tests are identical.
+      # NOTE: the full qwen3.6:35b model (~23GB) doesn't fit in the 16GB RAM a
+      # standard GitHub-hosted runner gives a public repo, so CI overrides to a
+      # small qwen3:4b model via docker-compose.ci.yml — local/full-fidelity
+      # runs (`make test`) keep the qwen3.6 default. This gate also runs only
+      # `-m smoke`. For fast, deterministic PR gates you can instead export a
+      # free hosted provider (see README "CI strategy") — the tests are identical.
       - name: Run AI smoke suite (dockerized, offline)
         run: |
-          docker compose run --rm \
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml run --rm \
             -e HEADLESS=true \
             tests pytest -m smoke
 

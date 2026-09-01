@@ -121,10 +121,16 @@ subset, then builds an Allure report **with trend history** and publishes it to
 **GitHub Pages** (enable Pages → deploy from `gh-pages`).
 
 **The honest part an interviewer will respect:** local LLM inference on a CPU-only
-GitHub-hosted runner is *slow*. This is why CI runs `-m smoke`, not the full suite.
-Two clean ways to scale it — both worth mentioning as design judgment:
+GitHub-hosted runner is *slow*, and the full-fidelity model doesn't even fit —
+`qwen3.6:35b` is ~23GB, well past the 16GB RAM a standard public-repo runner gets.
+`docker-compose.ci.yml` overrides CI to a small `qwen3:4b` model instead
+(`docker compose -f docker-compose.yml -f docker-compose.ci.yml run ...`), while
+`make test` and the live demo keep the full `qwen3.6` default. CI also runs
+`-m smoke`, not the full suite. Two more ways to scale it further — worth
+mentioning as design judgment:
 
-1. **Self-hosted / GPU runner** for the nightly full run; keep the offline model.
+1. **Self-hosted / GPU runner** for a nightly full run against the full-fidelity
+   `qwen3.6` model.
 2. **Provider swap for the PR gate.** Because Alumnium is provider-agnostic, the exact
    same tests run against a *free hosted* model just by changing one env var — e.g.
    `ALUMNIUM_MODEL=google` (Google AI Studio) or `ALUMNIUM_MODEL=github` (GitHub Models),

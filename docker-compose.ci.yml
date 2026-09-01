@@ -1,0 +1,12 @@
+# CI-only override: swap the full-fidelity qwen3.6:35b model (~23GB) for a
+# small qwen3 model that actually fits in the 16GB RAM a standard GitHub-hosted
+# runner gives a public repo. Local/full-fidelity runs (`make test`) still use
+# docker-compose.yml's qwen3.6 default — this file only applies in CI:
+#   docker compose -f docker-compose.yml -f docker-compose.ci.yml run ...
+services:
+  ollama-pull:
+    entrypoint: ["/bin/sh", "-c", "ollama pull qwen3:4b"]
+
+  tests:
+    environment:
+      ALUMNIUM_MODEL: "ollama/qwen3:4b"
