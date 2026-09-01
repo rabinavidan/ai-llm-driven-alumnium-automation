@@ -4,8 +4,20 @@
 # docker-compose.yml's qwen3.6 default — this file only applies in CI:
 #   docker compose -f docker-compose.yml -f docker-compose.ci.yml run ...
 services:
+  ollama:
+    environment:
+      # Keep the model resident in memory well past the gap between the
+      # warm-up call below and the test run, so tests hit a warm model
+      # instead of paying weight-load time against Alumnium's fixed
+      # 120s HTTP client timeout.
+      OLLAMA_KEEP_ALIVE: "30m"
+
   ollama-pull:
-    entrypoint: ["/bin/sh", "-c", "ollama pull qwen3:4b"]
+    # Pull, then issue one throwaway generate call so the model is already
+    # loaded into memory (not just downloaded to disk) before tests start —
+    # otherwise the first real request pays cold weight-load time on top of
+    # inference time and can blow Alumnium's fixed 120s HTTP client timeout.
+    entrypoint: ["/bin/sh", "-c", "ollama pull qwen3:4b && ollama run qwen3:4b 'hi'"]
 
   tests:
     environment:
