@@ -17,8 +17,8 @@ services:
     # loaded into memory (not just downloaded to disk) before tests start —
     # otherwise the first real request pays cold weight-load time on top of
     # inference time and can blow Alumnium's fixed 120s HTTP client timeout.
-    entrypoint: ["/bin/sh", "-c", "ollama pull qwen3:4b && ollama run qwen3:4b 'hi'"]
+    entrypoint: ["/bin/sh", "-c", "ollama pull qwen3:1.7b && ollama run qwen3:1.7b 'hi'"]
 
   tests:
     environment:
-      ALUMNIUM_MODEL: "ollama/qwen3:4b"
+      ALUMNIUM_MODEL: "ollama/qwen3:1.7b"
