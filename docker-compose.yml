@@ -9,6 +9,13 @@ services:
       - "11434:11434"
     volumes:
       - ollama-models:/root/.ollama
+    # Alumnium's ALUMNIUM_OLLAMA_URL validator requires a dotted hostname and
+    # rejects Compose's bare single-label service name ("ollama"), so give it
+    # an extra alias to resolve to on the default network.
+    networks:
+      default:
+        aliases:
+          - ollama.internal
     healthcheck:
       test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
       interval: 10s
@@ -51,7 +58,7 @@ services:
         condition: service_completed_successfully
     environment:
       ALUMNIUM_MODEL: "ollama"
-      ALUMNIUM_OLLAMA_URL: "http://ollama:11434"
+      ALUMNIUM_OLLAMA_URL: "http://ollama.internal:11434"
       SELENIUM_URL: "http://selenium:4444"
       BASE_URL: "https://www.saucedemo.com"
       HEADLESS: "true"
