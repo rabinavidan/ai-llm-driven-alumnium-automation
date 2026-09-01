@@ -121,21 +121,28 @@ subset, then builds an Allure report **with trend history** and publishes it to
 **GitHub Pages** (enable Pages → deploy from `gh-pages`).
 
 **The honest part an interviewer will respect:** local LLM inference on a CPU-only
-GitHub-hosted runner is *slow*, and the full-fidelity model doesn't even fit —
-`qwen3.6:35b` is ~23GB, well past the 16GB RAM a standard public-repo runner gets.
-`docker-compose.ci.yml` overrides CI to a small `qwen3:4b` model instead
-(`docker compose -f docker-compose.yml -f docker-compose.ci.yml run ...`), while
-`make test` and the live demo keep the full `qwen3.6` default. CI also runs
-`-m smoke`, not the full suite. Two more ways to scale it further — worth
-mentioning as design judgment:
+GitHub-hosted runner didn't just turn out *slow* — it turned out infeasible at every
+size tried. The full-fidelity `qwen3.6:35b` (~23GB) doesn't fit the 16GB RAM a
+standard public-repo runner gets; a `qwen3:4b` that does fit can't finish a planning
+call inside Alumnium's fixed 120s HTTP client timeout; and a `qwen3:1.7b` fast enough
+to answer in time isn't reliable enough to actually drive the real login form.
+
+So CI runs on the **GitHub Models API** instead (`docker-compose.ci.yml`, applied via
+`docker compose -f docker-compose.yml -f docker-compose.ci.yml run ...`) —
+`ALUMNIUM_MODEL=github`, authenticated with the workflow's own `GITHUB_TOKEN` via the
+`models: read` permission, so no secret to provision. `make test` and the live demo
+are untouched and still use the offline `qwen3.6` default. That's exactly the
+provider-swap design decoupling *test intent* from *model* was meant to demonstrate:
+same test code, one env var, zero code changes to fall back to a hosted model where
+local CPU inference can't cut it. CI also runs `-m smoke`, not the full suite.
+
+Two more ways to scale it further — worth mentioning as design judgment:
 
 1. **Self-hosted / GPU runner** for a nightly full run against the full-fidelity
-   `qwen3.6` model.
-2. **Provider swap for the PR gate.** Because Alumnium is provider-agnostic, the exact
-   same tests run against a *free hosted* model just by changing one env var — e.g.
-   `ALUMNIUM_MODEL=google` (Google AI Studio) or `ALUMNIUM_MODEL=github` (GitHub Models),
-   both of which have free tiers. No test code changes. That decoupling of *test intent*
-   from *model* is itself a strong architectural selling point.
+   `qwen3.6` model, fully offline.
+2. **A different hosted provider**, e.g. `ALUMNIUM_MODEL=google` (Google AI Studio,
+   needs a `GOOGLE_API_KEY` secret) — useful if GitHub Models' rate limits or model
+   choice become a constraint.
 
 ---
 

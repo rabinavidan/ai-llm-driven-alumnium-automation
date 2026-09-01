@@ -1,24 +1,21 @@
-# CI-only override: swap the full-fidelity qwen3.6:35b model (~23GB) for a
-# small qwen3 model that actually fits in the 16GB RAM a standard GitHub-hosted
-# runner gives a public repo. Local/full-fidelity runs (`make test`) still use
-# docker-compose.yml's qwen3.6 default — this file only applies in CI:
+# CI-only override: use the free GitHub Models API instead of a local Ollama
+# model. Local CPU inference didn't work out on a standard GitHub-hosted
+# runner: qwen3.6:35b (the full-fidelity default) doesn't fit in 16GB RAM;
+# qwen3:4b fits but can't finish a planning call within Alumnium's fixed 120s
+# HTTP client timeout; qwen3:1.7b answers fast enough but isn't reliable
+# enough to actually drive the real login form. Local/full-fidelity runs
+# (`make test`, the live demo) are untouched and still use the offline
+# qwen3.6 Ollama setup — this file only applies in CI:
 #   docker compose -f docker-compose.yml -f docker-compose.ci.yml run ...
+#
+# Needs OPENAI_API_KEY set in the environment `docker compose` runs in — CI
+# passes the workflow's own GITHUB_TOKEN (see .github/workflows/ci.yml),
+# which GitHub Models accepts given the `models: read` permission.
 services:
-  ollama:
-    environment:
-      # Keep the model resident in memory well past the gap between the
-      # warm-up call below and the test run, so tests hit a warm model
-      # instead of paying weight-load time against Alumnium's fixed
-      # 120s HTTP client timeout.
-      OLLAMA_KEEP_ALIVE: "30m"
-
   ollama-pull:
-    # Pull, then issue one throwaway generate call so the model is already
-    # loaded into memory (not just downloaded to disk) before tests start —
-    # otherwise the first real request pays cold weight-load time on top of
-    # inference time and can blow Alumnium's fixed 120s HTTP client timeout.
-    entrypoint: ["/bin/sh", "-c", "ollama pull qwen3:1.7b && ollama run qwen3:1.7b 'hi'"]
+    entrypoint: ["/bin/sh", "-c", "echo 'CI uses the GitHub Models provider — skipping local Ollama model pull'"]
 
   tests:
     environment:
-      ALUMNIUM_MODEL: "ollama/qwen3:1.7b"
+      ALUMNIUM_MODEL: "github"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:?set OPENAI_API_KEY (a token with GitHub Models access) to run CI}"

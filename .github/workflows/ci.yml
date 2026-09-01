@@ -6,9 +6,12 @@ on:
   pull_request:
   workflow_dispatch:
 
-# Needed for publishing the Allure report to the gh-pages branch.
+# contents: write publishes the Allure report to the gh-pages branch.
+# models: read lets the workflow's own GITHUB_TOKEN call the GitHub Models
+# API, which CI uses in place of local Ollama inference (see ci job below).
 permissions:
   contents: write
+  models: read
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -22,14 +25,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Bring up the fully self-contained stack: Ollama + Selenium + runner.
-      # NOTE: the full qwen3.6:35b model (~23GB) doesn't fit in the 16GB RAM a
-      # standard GitHub-hosted runner gives a public repo, so CI overrides to a
-      # small qwen3:4b model via docker-compose.ci.yml — local/full-fidelity
-      # runs (`make test`) keep the qwen3.6 default. This gate also runs only
-      # `-m smoke`. For fast, deterministic PR gates you can instead export a
-      # free hosted provider (see README "CI strategy") — the tests are identical.
-      - name: Run AI smoke suite (dockerized, offline)
+      # Bring up the stack: Selenium + runner, using the GitHub Models API in
+      # place of local Ollama inference (see docker-compose.ci.yml and the
+      # README's "CI strategy" section for why: on a standard GitHub-hosted
+      # runner, the full qwen3.6:35b model doesn't fit in RAM, a smaller
+      # qwen3:4b can't finish a planning call within Alumnium's fixed 120s
+      # client timeout, and a yet-smaller qwen3:1.7b isn't reliable enough to
+      # drive the real page). Local/full-fidelity runs (`make test`) are
+      # unaffected and still use the offline qwen3.6 Ollama setup. This gate
+      # also runs only `-m smoke`, not the full suite.
+      - name: Run AI smoke suite (GitHub Models provider)
+        env:
+          OPENAI_API_KEY: ${{ secrets.GITHUB_TOKEN }}
         run: |
           docker compose -f docker-compose.yml -f docker-compose.ci.yml run --rm \
             -e HEADLESS=true \
