@@ -1,0 +1,13 @@
+# --- Core AI test layer ---
+alumnium            # AI-native layer over Selenium/Playwright/Appium
+# If a provider extra is required by your Alumnium version, use e.g. alumnium[ollama]
+
+# --- Browser automation ---
+selenium>=4.27.0
+
+# --- Test runner + reporting ---
+pytest>=8.0
+allure-pytest>=2.13
+
+# --- Config ---
+python-dotenv>=1.0

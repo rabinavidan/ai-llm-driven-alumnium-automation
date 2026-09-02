@@ -1,0 +1,77 @@
+name: AI E2E (Alumnium) CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+# Needed for publishing the Allure report to the gh-pages branch.
+permissions:
+  contents: write
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    # Local CPU inference is slow — cap it and keep CI to the smoke subset.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      # Bring up the stack: Selenium + runner, using the Google AI Studio API
+      # in place of local Ollama inference (see docker-compose.ci.yml and the
+      # README's "CI strategy" section for why: on a standard GitHub-hosted
+      # runner, the full qwen3.6:35b model doesn't fit in RAM, a smaller
+      # qwen3:4b can't finish a planning call within Alumnium's fixed 120s
+      # client timeout, a yet-smaller qwen3:1.7b isn't reliable enough to
+      # drive the real page, and GitHub Models — tried next — turned out to
+      # have been fully retired on 2026-07-30). Local/full-fidelity runs
+      # (`make test`) are unaffected and still use the offline qwen3.6 Ollama
+      # setup. This gate also runs only `-m smoke`, not the full suite.
+      #
+      # Requires a GOOGLE_API_KEY repo secret (Settings > Secrets and
+      # variables > Actions) — get a free key at https://aistudio.google.com/apikey.
+      - name: Run AI smoke suite (Google AI Studio provider)
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml run --rm \
+            -e HEADLESS=true \
+            tests pytest -m smoke
+
+      # Always publish a report, even on failure.
+      - name: Load Allure history
+        uses: actions/checkout@v4
+        if: always()
+        continue-on-error: true
+        with:
+          ref: gh-pages
+          path: gh-pages
+
+      - name: Generate Allure report
+        uses: simple-elf/allure-report-action@v1.15
+        if: always()
+        with:
+          allure_results: allure-results
+          allure_history: allure-history
+          gh_pages: gh-pages
+          keep_reports: 30
+
+      - name: Publish report to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        if: always() && github.ref == 'refs/heads/main'
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: allure-history
+
+      - name: Upload raw results as artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: allure-results
+          path: allure-results

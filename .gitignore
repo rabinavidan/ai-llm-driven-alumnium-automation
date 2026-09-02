@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Test + report artifacts
+allure-results/
+allure-report/
+allure-history/
+.pytest_cache/
+
+# Env
+.env
+
+# OS
+.DS_Store
