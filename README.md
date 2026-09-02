@@ -127,22 +127,27 @@ standard public-repo runner gets; a `qwen3:4b` that does fit can't finish a plan
 call inside Alumnium's fixed 120s HTTP client timeout; and a `qwen3:1.7b` fast enough
 to answer in time isn't reliable enough to actually drive the real login form.
 
-So CI runs on the **GitHub Models API** instead (`docker-compose.ci.yml`, applied via
+The next candidate was the free **GitHub Models API** (`ALUMNIUM_MODEL=github`,
+authenticated with the workflow's own `GITHUB_TOKEN` — no secret to provision). That
+also failed, for a reason no amount of local debugging would have caught: GitHub
+Models was [fully retired on 2026-07-30](https://github.blog/changelog/2026-07-30-github-models-is-now-retired/),
+so the API simply doesn't exist anymore. Alumnium's own docs still list it as a
+provider — a good reminder that "the docs say it works" and "it works" are different
+claims, especially for anything wrapping a fast-moving external service.
+
+So CI runs on **Google AI Studio** instead (`docker-compose.ci.yml`, applied via
 `docker compose -f docker-compose.yml -f docker-compose.ci.yml run ...`) —
-`ALUMNIUM_MODEL=github`, authenticated with the workflow's own `GITHUB_TOKEN` via the
-`models: read` permission, so no secret to provision. `make test` and the live demo
-are untouched and still use the offline `qwen3.6` default. That's exactly the
-provider-swap design decoupling *test intent* from *model* was meant to demonstrate:
-same test code, one env var, zero code changes to fall back to a hosted model where
-local CPU inference can't cut it. CI also runs `-m smoke`, not the full suite.
+`ALUMNIUM_MODEL=google`, reading a `GOOGLE_API_KEY` repo secret (free key at
+[aistudio.google.com/apikey](https://aistudio.google.com/apikey)). `make test` and the
+live demo are untouched and still use the offline `qwen3.6` default. That's exactly
+the provider-swap design decoupling *test intent* from *model* was meant to
+demonstrate: same test code, one env var, zero code changes to fall back to a hosted
+model where local CPU inference can't cut it. CI also runs `-m smoke`, not the full
+suite.
 
-Two more ways to scale it further — worth mentioning as design judgment:
-
-1. **Self-hosted / GPU runner** for a nightly full run against the full-fidelity
-   `qwen3.6` model, fully offline.
-2. **A different hosted provider**, e.g. `ALUMNIUM_MODEL=google` (Google AI Studio,
-   needs a `GOOGLE_API_KEY` secret) — useful if GitHub Models' rate limits or model
-   choice become a constraint.
+One more way to scale it further — worth mentioning as design judgment: a
+**self-hosted / GPU runner** for a nightly full run against the full-fidelity
+`qwen3.6` model, fully offline.
 
 ---
 

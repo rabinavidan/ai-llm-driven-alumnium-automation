@@ -1,21 +1,23 @@
-# CI-only override: use the free GitHub Models API instead of a local Ollama
-# model. Local CPU inference didn't work out on a standard GitHub-hosted
-# runner: qwen3.6:35b (the full-fidelity default) doesn't fit in 16GB RAM;
-# qwen3:4b fits but can't finish a planning call within Alumnium's fixed 120s
-# HTTP client timeout; qwen3:1.7b answers fast enough but isn't reliable
-# enough to actually drive the real login form. Local/full-fidelity runs
-# (`make test`, the live demo) are untouched and still use the offline
-# qwen3.6 Ollama setup — this file only applies in CI:
+# CI-only override: use the free Google AI Studio API instead of a local
+# Ollama model. Local CPU inference didn't work out on a standard GitHub-
+# hosted runner: qwen3.6:35b (the full-fidelity default) doesn't fit in 16GB
+# RAM; qwen3:4b fits but can't finish a planning call within Alumnium's fixed
+# 120s HTTP client timeout; qwen3:1.7b answers fast enough but isn't reliable
+# enough to actually drive the real login form. GitHub Models (tried next)
+# turned out to have been fully retired on 2026-07-30, so it's not viable
+# either. Local/full-fidelity runs (`make test`, the live demo) are
+# untouched and still use the offline qwen3.6 Ollama setup — this file only
+# applies in CI:
 #   docker compose -f docker-compose.yml -f docker-compose.ci.yml run ...
 #
-# Needs OPENAI_API_KEY set in the environment `docker compose` runs in — CI
-# passes the workflow's own GITHUB_TOKEN (see .github/workflows/ci.yml),
-# which GitHub Models accepts given the `models: read` permission.
+# Needs GOOGLE_API_KEY set in the environment `docker compose` runs in — CI
+# passes it through from the GOOGLE_API_KEY repo secret (see
+# .github/workflows/ci.yml). Get a free key at https://aistudio.google.com/apikey.
 services:
   ollama-pull:
-    entrypoint: ["/bin/sh", "-c", "echo 'CI uses the GitHub Models provider — skipping local Ollama model pull'"]
+    entrypoint: ["/bin/sh", "-c", "echo 'CI uses the Google AI Studio provider — skipping local Ollama model pull'"]
 
   tests:
     environment:
-      ALUMNIUM_MODEL: "github"
-      OPENAI_API_KEY: "${OPENAI_API_KEY:?set OPENAI_API_KEY (a token with GitHub Models access) to run CI}"
+      ALUMNIUM_MODEL: "google"
+      GOOGLE_API_KEY: "${GOOGLE_API_KEY:?set GOOGLE_API_KEY (from https://aistudio.google.com/apikey) to run CI}"

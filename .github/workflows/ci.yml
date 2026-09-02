@@ -6,12 +6,9 @@ on:
   pull_request:
   workflow_dispatch:
 
-# contents: write publishes the Allure report to the gh-pages branch.
-# models: read lets the workflow's own GITHUB_TOKEN call the GitHub Models
-# API, which CI uses in place of local Ollama inference (see ci job below).
+# Needed for publishing the Allure report to the gh-pages branch.
 permissions:
   contents: write
-  models: read
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -25,18 +22,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Bring up the stack: Selenium + runner, using the GitHub Models API in
-      # place of local Ollama inference (see docker-compose.ci.yml and the
+      # Bring up the stack: Selenium + runner, using the Google AI Studio API
+      # in place of local Ollama inference (see docker-compose.ci.yml and the
       # README's "CI strategy" section for why: on a standard GitHub-hosted
       # runner, the full qwen3.6:35b model doesn't fit in RAM, a smaller
       # qwen3:4b can't finish a planning call within Alumnium's fixed 120s
-      # client timeout, and a yet-smaller qwen3:1.7b isn't reliable enough to
-      # drive the real page). Local/full-fidelity runs (`make test`) are
-      # unaffected and still use the offline qwen3.6 Ollama setup. This gate
-      # also runs only `-m smoke`, not the full suite.
-      - name: Run AI smoke suite (GitHub Models provider)
+      # client timeout, a yet-smaller qwen3:1.7b isn't reliable enough to
+      # drive the real page, and GitHub Models — tried next — turned out to
+      # have been fully retired on 2026-07-30). Local/full-fidelity runs
+      # (`make test`) are unaffected and still use the offline qwen3.6 Ollama
+      # setup. This gate also runs only `-m smoke`, not the full suite.
+      #
+      # Requires a GOOGLE_API_KEY repo secret (Settings > Secrets and
+      # variables > Actions) — get a free key at https://aistudio.google.com/apikey.
+      - name: Run AI smoke suite (Google AI Studio provider)
         env:
-          OPENAI_API_KEY: ${{ secrets.GITHUB_TOKEN }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
           docker compose -f docker-compose.yml -f docker-compose.ci.yml run --rm \
             -e HEADLESS=true \
